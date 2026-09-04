@@ -5,6 +5,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Cemetery Bird</title>
+  <!-- Firebase (client SDK only — no server needed). The modular SDK is
+       imported directly inside the <script type="module"> block below,
+       matching the snippet Firebase's console gives you when you register
+       a web app. See the CONFIG SETUP comment near the top of that script
+       for setup steps — note the security RULES are configured in the
+       Firebase Console itself (Firestore Database -> Rules tab), not here. -->
   <style>
     * {
       margin: 0;
@@ -394,6 +400,13 @@
       padding: 12px 16px 18px;
     }
 
+    #backendStatus {
+      font-size: 0.7em;
+      opacity: 0.6;
+      font-style: italic;
+      margin-bottom: 4px;
+    }
+
     .dashSection h3 {
       font-size: 0.8em;
       letter-spacing: 2px;
@@ -502,6 +515,7 @@
           <button id="dashboardCloseBtn">✕</button>
         </div>
         <div id="dashboardBody">
+          <div id="backendStatus"></div>
           <div class="dashSection">
             <h3>Leaderboard</h3>
             <ul id="leaderboardList" class="lbList"></ul>
@@ -515,7 +529,71 @@
     </div>
   </div>
 
-  <script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
+    import {
+      getFirestore, collection, addDoc, getDocs, query, orderBy, limit
+    } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js";
+
+    // =======================================================================
+    // CONFIG SETUP — shared backend (Firebase Firestore)
+    // =======================================================================
+    // 1. Firestore must be turned on separately from Analytics — in the
+    //    Firebase Console: Build -> Firestore Database -> Create database
+    //    (any region, "test mode" is fine to start).
+    // 2. The config below is exactly the object the console gives you when
+    //    you register a web app (Project settings -> General -> Your apps).
+    //    Make sure the FULL, unredacted apiKey and appId are pasted in —
+    //    if you'd masked part of them before sharing, put the real values
+    //    back here before pushing.
+    // 3. RULES live in the console, not in this file: Firestore Database ->
+    //    the "Rules" tab (next to "Data") -> replace the default rules with
+    //    something like this -> click Publish. This is what allows public
+    //    read + bounded, append-only writes so people can't post garbage
+    //    or edit others' scores:
+    //
+    //      rules_version = '2';
+    //      service cloud.firestore {
+    //        match /databases/{database}/documents {
+    //          match /runs/{doc} {
+    //            allow read: if true;
+    //            allow create: if request.resource.data.name is string
+    //                          && request.resource.data.name.size() <= 20
+    //                          && request.resource.data.score is number
+    //                          && request.resource.data.score >= 0
+    //                          && request.resource.data.score <= 1000
+    //                          && request.resource.data.diff in ['easy','normal','hard']
+    //                          && request.resource.data.date is number;
+    //            allow update, delete: if false;
+    //          }
+    //        }
+    //      }
+    //
+    // 4. Commit + push. If Firestore isn't set up yet, or init fails for
+    //    any reason, the game still works fully — it falls back to a
+    //    local-only leaderboard stored in this browser (see the
+    //    backendStatus note in the Dashboard).
+    const firebaseConfig = {
+      apiKey: "AIzaSyCR5S50ae5G1Bzc6XLtHhLPj8ucVpFmvdI",
+      authDomain: "cemetery-bird.firebaseapp.com",
+      projectId: "cemetery-bird",
+      storageBucket: "cemetery-bird.firebasestorage.app",
+      messagingSenderId: "287341703938",
+      appId: "1:287341703938:web:101d73fd8f338f522fc81b"
+    };
+
+    let db = null;
+    let backendReady = false;
+    try {
+      const app = initializeApp(firebaseConfig);
+      db = getFirestore(app);
+      backendReady = true;
+    } catch (e) {
+      console.warn('Firebase init failed, falling back to local-only leaderboard.', e);
+      db = null;
+      backendReady = false;
+    }
+
     const canvas = document.getElementById('game');
     const ctx = canvas.getContext('2d');
     const W = canvas.width, H = canvas.height;
@@ -537,6 +615,7 @@
     const dashboardPanelEl = document.getElementById('dashboardPanel');
     const dashboardCardEl = document.getElementById('dashboardCard');
     const dashboardCloseBtn = document.getElementById('dashboardCloseBtn');
+    const backendStatusEl = document.getElementById('backendStatus');
     const leaderboardListEl = document.getElementById('leaderboardList');
     const triesListEl = document.getElementById('triesList');
 
@@ -549,12 +628,12 @@
     // ---------------------------------------------------------------------
     // Run history (dashboard + leaderboard)
     // ---------------------------------------------------------------------
-    // Static file, no backend — persisted via localStorage so it survives
-    // reloads once this is hosted for real. That means it's scoped to
-    // whoever plays on this particular browser/device, not a shared
-    // cross-device leaderboard (that would need an actual backend).
+    // Local cache always used for instant UI + as a fallback when the
+    // shared backend isn't configured or a request fails. When Firebase
+    // IS configured, the Leaderboard and All Tries lists are fetched from
+    // Firestore instead, so every player sees the same shared data.
     const RUNS_KEY = 'cemeteryBirdRuns';
-    function loadRuns() {
+    function loadLocalRuns() {
       try {
         const raw = localStorage.getItem(RUNS_KEY);
         return raw ? JSON.parse(raw) : [];
@@ -562,40 +641,78 @@
         return [];
       }
     }
-    function saveRuns(runs) {
+    function saveLocalRuns(runs) {
       try {
         localStorage.setItem(RUNS_KEY, JSON.stringify(runs));
       } catch (e) {
-        // storage unavailable (private browsing, sandboxed preview, etc.) — just keep in memory
+        // storage unavailable (private browsing, sandboxed preview, etc.) — ignore
       }
     }
-    let runHistory = loadRuns();
-    function recordRun(name, score, diff) {
-      runHistory.unshift({ name, score, diff, date: Date.now() });
-      if (runHistory.length > 200) runHistory.length = 200;
-      saveRuns(runHistory);
-    }
-    function renderDashboard() {
-      const leaderboard = [...runHistory].sort((a, b) => b.score - a.score).slice(0, 10);
-      leaderboardListEl.innerHTML = leaderboard.length
-        ? leaderboard.map((r, i) => `
-            <li>
-              <span class="lbRank">#${i + 1}</span>
-              <span class="lbName">${escapeHtml(r.name)}</span>
-              <span class="lbScore">${r.score} Isaac</span>
-              <span class="lbDiff">${escapeHtml(r.diff)}</span>
-            </li>`).join('')
-        : '<li class="empty">No runs yet</li>';
+    let localRuns = loadLocalRuns();
 
-      triesListEl.innerHTML = runHistory.length
-        ? runHistory.slice(0, 30).map(r => `
-            <li>
-              <span class="lbName">${escapeHtml(r.name)}</span>
-              <span class="lbScore">${r.score} Isaac</span>
-              <span class="lbDiff">${escapeHtml(r.diff)}</span>
-              <span class="lbDate">${new Date(r.date).toLocaleDateString()}</span>
-            </li>`).join('')
-        : '<li class="empty">No tries yet</li>';
+    async function recordRun(name, score, diff) {
+      const entry = { name, score, diff, date: Date.now() };
+      localRuns.unshift(entry);
+      if (localRuns.length > 200) localRuns.length = 200;
+      saveLocalRuns(localRuns);
+      if (db) {
+        try {
+          await addDoc(collection(db, 'runs'), entry);
+        } catch (e) {
+          console.warn('Could not save run to shared backend, kept locally only.', e);
+        }
+      }
+    }
+
+    async function fetchLeaderboard() {
+      if (db) {
+        try {
+          const snap = await getDocs(query(collection(db, 'runs'), orderBy('score', 'desc'), limit(10)));
+          return snap.docs.map(d => d.data());
+        } catch (e) {
+          console.warn('Could not load shared leaderboard, showing local scores instead.', e);
+        }
+      }
+      return [...localRuns].sort((a, b) => b.score - a.score).slice(0, 10);
+    }
+
+    async function fetchRecentTries() {
+      if (db) {
+        try {
+          const snap = await getDocs(query(collection(db, 'runs'), orderBy('date', 'desc'), limit(30)));
+          return snap.docs.map(d => d.data());
+        } catch (e) {
+          console.warn('Could not load shared tries, showing local history instead.', e);
+        }
+      }
+      return localRuns.slice(0, 30);
+    }
+
+    function renderList(el, rows, rowFn, emptyText) {
+      el.innerHTML = rows.length ? rows.map(rowFn).join('') : `<li class="empty">${emptyText}</li>`;
+    }
+
+    async function renderDashboard() {
+      backendStatusEl.textContent = backendReady
+        ? 'Shared leaderboard (everyone who plays this site)'
+        : 'Local only — shared backend not configured yet (see CONFIG SETUP in the file)';
+      leaderboardListEl.innerHTML = '<li class="empty">Loading…</li>';
+      triesListEl.innerHTML = '<li class="empty">Loading…</li>';
+      const [leaderboard, tries] = await Promise.all([fetchLeaderboard(), fetchRecentTries()]);
+      renderList(leaderboardListEl, leaderboard, (r, i) => `
+        <li>
+          <span class="lbRank">#${i + 1}</span>
+          <span class="lbName">${escapeHtml(r.name)}</span>
+          <span class="lbScore">${r.score} Isaac</span>
+          <span class="lbDiff">${escapeHtml(r.diff)}</span>
+        </li>`, 'No runs yet');
+      renderList(triesListEl, tries, r => `
+        <li>
+          <span class="lbName">${escapeHtml(r.name)}</span>
+          <span class="lbScore">${r.score} Isaac</span>
+          <span class="lbDiff">${escapeHtml(r.diff)}</span>
+          <span class="lbDate">${new Date(r.date).toLocaleDateString()}</span>
+        </li>`, 'No tries yet');
     }
     dashboardBtn.addEventListener('click', (e) => {
       e.stopPropagation();
