@@ -34,8 +34,10 @@
     canvas {
       background: transparent;
       display: block;
-      max-height: 100vh;
-      max-width: 100vw;
+      max-height: min(100vh, 700px);
+      max-width: min(100vw, 467px);
+      width: auto;
+      height: auto;
       box-shadow: 0 0 40px rgba(0, 0, 0, 0.3);
       cursor: pointer;
     }
@@ -126,6 +128,86 @@
     #cityBanner.show {
       opacity: 1;
     }
+
+    /* Full-screen freeze splash for finding Isaac */
+    #isaacSplash {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(4, 2, 10, 0);
+      backdrop-filter: blur(0px);
+      -webkit-backdrop-filter: blur(0px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.5s ease, background 0.5s ease, backdrop-filter 0.5s ease;
+      text-align: center;
+      z-index: 10;
+      cursor: pointer;
+    }
+
+    #isaacSplash.show {
+      opacity: 1;
+      background: rgba(4, 2, 10, 0.82);
+      backdrop-filter: blur(2px);
+      -webkit-backdrop-filter: blur(2px);
+      pointer-events: auto;
+    }
+
+    #isaacSplash .icon {
+      font-size: 4.2em;
+      filter: drop-shadow(0 0 18px #f0a83c88);
+      transform: scale(0.85);
+      transition: transform 0.5s cubic-bezier(.34, 1.56, .64, 1);
+    }
+
+    #isaacSplash.show .icon {
+      transform: scale(1);
+    }
+
+    #isaacSplash h2 {
+      margin-top: 14px;
+      font-size: 1.9em;
+      font-family: 'Georgia', serif;
+      letter-spacing: 1px;
+      color: #efe8c8;
+      text-shadow: 0 0 20px #f0a83caa, 0 0 40px #7a4fd688;
+    }
+
+    #isaacSplash p {
+      margin-top: 8px;
+      font-size: 1em;
+      font-style: italic;
+      color: #b8a8d8;
+      opacity: 0.85;
+    }
+
+    #isaacSplash .hint {
+      margin-top: 26px;
+      font-size: 0.8em;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #a698c4;
+      opacity: 0.7;
+      animation: pulseHint 1.6s ease-in-out infinite;
+    }
+
+    @keyframes pulseHint {
+
+      0%,
+      100% {
+        opacity: 0.4;
+      }
+
+      50% {
+        opacity: 0.9;
+      }
+    }
   </style>
 </head>
 
@@ -133,12 +215,18 @@
   <div id="wrap">
     <canvas id="game" width="400" height="600"></canvas>
     <div id="score">Isaac</div>
-    <div id="tagline">Collect 40 Isaacs to increase your chances of finding Isaac</div>
+    <div id="tagline">Collect 50 Isaacs to increase your chances of finding Isaac</div>
     <div id="cityLabel">London</div>
     <div id="cityBanner"></div>
     <div id="overlay">
       <h1 id="msgTitle">Cemetery Bird</h1>
       <p id="msgSub">Tap or press Space to start</p>
+    </div>
+    <div id="isaacSplash">
+      <div class="icon">🪦</div>
+      <h2>You found Isaac...</h2>
+      <p>He rests among the fallen.</p>
+      <div class="hint">Tap to continue flying</div>
     </div>
   </div>
 
@@ -153,6 +241,7 @@
     const msgSub = document.getElementById('msgSub');
     const cityLabelEl = document.getElementById('cityLabel');
     const cityBannerEl = document.getElementById('cityBanner');
+    const isaacSplashEl = document.getElementById('isaacSplash');
 
     // Cities the bird passes through, one every 5 points, then looping
     const CITIES = [
@@ -183,6 +272,13 @@
         groundColor: '#241a10', grassColor: '#2f4028', crackColor: '#160f09',
         stone: '#5c5c66', stoneOutline: '#2e2e35', moss: 'rgba(90,120,70,0.35)',
         accent: '#4a2f5c', fog: 'rgba(210,200,230,0.10)'
+      },
+      {
+        id: 'santorini', name: 'Santorini',
+        skyTop: '#0a1830', skyMid: '#2a4a68',
+        groundColor: '#2a2420', grassColor: '#3a5a6a', crackColor: '#161310',
+        stone: '#e8e4d8', stoneOutline: '#8a8578', moss: 'rgba(70,130,180,0.25)',
+        accent: '#2f6fa8', fog: 'rgba(200,220,230,0.10)'
       }
     ];
     const SCORES_PER_CITY = 5;
@@ -208,13 +304,25 @@
       showBanner(`Welcome to ${name}`);
     }
 
-    // Special "Isaac's grave" set piece.
-    // Design target: appears in Prague, around the 40-point mark (the finale loop).
-    // TEMP FOR TESTING: firing early at score 2 so it's easy to check — change
-    // ISAAC_GRAVE_SCORE back to 40 (and it'll naturally land in Prague) when done testing.
-    const ISAAC_GRAVE_SCORE = 2;
+    // Special "Isaac's grave" set piece: freezes the game with a full-screen
+    // splash, then a decorated grave with a candle spawns as the next obstacle.
+    // With 5 cities cycling every 5 points, score 45-49 falls in Santorini,
+    // and the reveal fires right as the 50th point is scored.
+    const ISAAC_GRAVE_SCORE = 50;
     let isaacGraveTriggered = false;
     let pendingIsaacGrave = false;
+    let frozen = false;
+
+    function triggerIsaacFreeze() {
+      frozen = true;
+      isaacSplashEl.classList.add('show');
+    }
+    function resumeFromFreeze() {
+      frozen = false;
+      isaacSplashEl.classList.remove('show');
+      // give the bird a lift so play picks back up smoothly
+      bird.vy = FLAP;
+    }
 
     // Game state
     let state = 'ready'; // ready | playing | dead
@@ -254,9 +362,15 @@
       cityBannerEl.classList.remove('show');
       isaacGraveTriggered = false;
       pendingIsaacGrave = false;
+      frozen = false;
+      isaacSplashEl.classList.remove('show');
     }
 
     function flap() {
+      if (frozen) {
+        resumeFromFreeze();
+        return;
+      }
       if (state === 'ready') {
         state = 'playing';
         overlay.style.display = 'none';
@@ -289,6 +403,10 @@
     }
 
     function update() {
+      if (frozen) {
+        frame++; // keep ambient animation (stars, candle) alive while paused
+        return;
+      }
       frame++;
 
       if (state === 'playing') {
@@ -304,17 +422,18 @@
             p.passed = true;
             score++;
             scoreEl.textContent = formatScore(score);
+            const foundIsaacNow = !isaacGraveTriggered && score === ISAAC_GRAVE_SCORE;
             const newCityIndex = cityIndexForScore(score);
-            if (newCityIndex !== lastCityIndex) {
+            if (newCityIndex !== lastCityIndex && !foundIsaacNow) {
               lastCityIndex = newCityIndex;
               currentCity = CITIES[newCityIndex];
               cityLabelEl.textContent = currentCity.name;
               showCityBanner(currentCity.name);
             }
-            if (!isaacGraveTriggered && score === ISAAC_GRAVE_SCORE) {
+            if (foundIsaacNow) {
               isaacGraveTriggered = true;
               pendingIsaacGrave = true;
-              showBanner('You found Isaac...');
+              triggerIsaacFreeze();
             }
           }
         }
@@ -441,8 +560,8 @@
       ctx.fill();
 
       // headstone, slightly warmer/lighter than regular tombstones
-      ctx.fillStyle = '#8f8676';
-      ctx.strokeStyle = '#4a4438';
+      ctx.fillStyle = '#c9c0a8';
+      ctx.strokeStyle = '#6b6250';
       ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.moveTo(x, y + h);
@@ -617,6 +736,20 @@
             }
             break;
           }
+          case 'santorini': {
+            // cluster of whitewashed cliffside buildings with blue domes
+            for (let a = 0; a < 2; a++) {
+              const ax = x + a * 55;
+              ctx.fillStyle = '#e8e4d8';
+              ctx.fillRect(ax, baseY - 34, 30, 34);
+              ctx.fillStyle = currentCity.accent;
+              ctx.beginPath();
+              ctx.arc(ax + 15, baseY - 34, 13, Math.PI, 0, false);
+              ctx.fill();
+            }
+            ctx.fillStyle = currentCity.accent;
+            break;
+          }
         }
       }
       ctx.globalAlpha = 1;
@@ -651,6 +784,8 @@
 
     canvas.addEventListener('mousedown', flap);
     canvas.addEventListener('touchstart', (e) => { e.preventDefault(); flap(); }, { passive: false });
+    isaacSplashEl.addEventListener('mousedown', flap);
+    isaacSplashEl.addEventListener('touchstart', (e) => { e.preventDefault(); flap(); }, { passive: false });
     document.addEventListener('keydown', (e) => {
       if (e.code === 'Space') { e.preventDefault(); flap(); }
     });
