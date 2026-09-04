@@ -133,12 +133,12 @@
   <div id="wrap">
     <canvas id="game" width="400" height="600"></canvas>
     <div id="score">Isaac</div>
-    <div id="tagline">Find Isaac... collect 40 Isaacs to increase your chances</div>
+    <div id="tagline">Collect 40 Isaacs to increase your chances of finding Isaac</div>
     <div id="cityLabel">London</div>
     <div id="cityBanner"></div>
     <div id="overlay">
       <h1 id="msgTitle">Cemetery Bird</h1>
-      <p id="msgSub">Tap or press Space to rise</p>
+      <p id="msgSub">Tap or press Space to start</p>
     </div>
   </div>
 
@@ -190,7 +190,7 @@
       return Math.floor(s / SCORES_PER_CITY) % CITIES.length;
     }
     function formatScore(s) {
-      return s === 0 ? 'Isaac' : `${s} Isaac`;
+      return s === 0 ? 'Find Isaac' : `${s} Isaac`;
     }
     function formatBest(s) {
       return `${s} Isaac`;
