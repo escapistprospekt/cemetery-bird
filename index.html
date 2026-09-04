@@ -69,6 +69,46 @@
       opacity: 0.9;
     }
 
+    #statsLine {
+      margin-top: 10px;
+      font-size: 0.75em;
+      opacity: 0.7;
+      font-style: italic;
+    }
+
+    #difficultyPanel {
+      margin-top: 22px;
+      display: flex;
+      gap: 10px;
+      pointer-events: auto;
+    }
+
+    .diffBtn {
+      pointer-events: auto;
+      font-family: 'Georgia', serif;
+      font-size: 0.85em;
+      letter-spacing: 1px;
+      padding: 8px 16px;
+      border-radius: 6px;
+      border: 1px solid #7a6fa0;
+      background: rgba(40, 28, 60, 0.55);
+      color: #d8c9f0;
+      cursor: pointer;
+      transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+    }
+
+    .diffBtn:hover {
+      background: rgba(60, 42, 90, 0.75);
+      transform: translateY(-1px);
+    }
+
+    .diffBtn.selected {
+      background: #7a4fd6;
+      border-color: #efe8c8;
+      color: #efe8c8;
+      box-shadow: 0 0 14px #7a4fd688;
+    }
+
     #score {
       position: absolute;
       top: 24px;
@@ -106,6 +146,31 @@
       text-transform: uppercase;
       color: #b8a8d8;
       opacity: 0.8;
+      pointer-events: none;
+      font-family: 'Georgia', serif;
+    }
+
+    #triesLabel {
+      position: absolute;
+      top: 24px;
+      left: 20px;
+      font-size: 0.8em;
+      letter-spacing: 1px;
+      color: #d8c9f0;
+      opacity: 0.85;
+      pointer-events: none;
+      font-family: 'Georgia', serif;
+    }
+
+    #diffLabel {
+      position: absolute;
+      top: 44px;
+      left: 20px;
+      font-size: 0.65em;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #a698c4;
+      opacity: 0.7;
       pointer-events: none;
       font-family: 'Georgia', serif;
     }
@@ -217,10 +282,18 @@
     <div id="score">Isaac</div>
     <div id="tagline">Collect 50 Isaacs to increase your chances of finding Isaac</div>
     <div id="cityLabel">London</div>
+    <div id="triesLabel">Tries: 3</div>
+    <div id="diffLabel">Normal</div>
     <div id="cityBanner"></div>
     <div id="overlay">
       <h1 id="msgTitle">Cemetery Bird</h1>
       <p id="msgSub">Tap or press Space to start</p>
+      <p id="statsLine"></p>
+      <div id="difficultyPanel">
+        <button class="diffBtn" data-diff="easy">Easy</button>
+        <button class="diffBtn selected" data-diff="normal">Normal</button>
+        <button class="diffBtn" data-diff="hard">Hard</button>
+      </div>
     </div>
     <div id="isaacSplash">
       <div class="icon">🪦</div>
@@ -239,9 +312,66 @@
     const overlay = document.getElementById('overlay');
     const msgTitle = document.getElementById('msgTitle');
     const msgSub = document.getElementById('msgSub');
+    const statsLineEl = document.getElementById('statsLine');
     const cityLabelEl = document.getElementById('cityLabel');
     const cityBannerEl = document.getElementById('cityBanner');
     const isaacSplashEl = document.getElementById('isaacSplash');
+    const triesLabelEl = document.getElementById('triesLabel');
+    const diffLabelEl = document.getElementById('diffLabel');
+    const difficultyPanelEl = document.getElementById('difficultyPanel');
+    const diffButtons = Array.from(document.querySelectorAll('.diffBtn'));
+
+    // ---------------------------------------------------------------------
+    // Analytics
+    // ---------------------------------------------------------------------
+    // This is a static file with no backend, so "analytics" here means:
+    //  1) an in-memory session log + on-screen session stats (games played,
+    //     session best/average) — resets on page reload, no storage used.
+    //  2) a single trackEvent() choke point. Once this is hosted for real,
+    //     drop in a privacy-friendly analytics snippet (e.g. Plausible,
+    //     GoatCounter, or Google Analytics's gtag.js) in <head>, and
+    //     trackEvent() will automatically forward events to it if it finds
+    //     window.plausible or window.gtag — no other code changes needed.
+    const analyticsLog = [];
+    function trackEvent(name, data = {}) {
+      analyticsLog.push({ name, data, t: Date.now() });
+      console.log('[analytics]', name, data);
+      if (typeof window.gtag === 'function') window.gtag('event', name, data);
+      if (typeof window.plausible === 'function') window.plausible(name, { props: data });
+    }
+    let gamesPlayed = 0;
+    let sessionScoreSum = 0;
+    let sessionBest = 0;
+
+    // ---------------------------------------------------------------------
+    // Difficulty modes
+    // ---------------------------------------------------------------------
+    const DIFFICULTIES = {
+      easy: { label: 'Easy', gravity: 0.35, flap: -7.5, pipeGap: 185, pipeSpeed: 2.2, pipeInterval: 105 },
+      normal: { label: 'Normal', gravity: 0.45, flap: -8, pipeGap: 155, pipeSpeed: 2.6, pipeInterval: 95 },
+      hard: { label: 'Hard', gravity: 0.55, flap: -8.5, pipeGap: 130, pipeSpeed: 3.2, pipeInterval: 85 }
+    };
+    let difficulty = 'normal';
+    let cfg = DIFFICULTIES[difficulty];
+    function selectDifficulty(key) {
+      difficulty = key;
+      cfg = DIFFICULTIES[key];
+      diffLabelEl.textContent = cfg.label;
+      diffButtons.forEach(btn => btn.classList.toggle('selected', btn.dataset.diff === key));
+    }
+    diffButtons.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (state !== 'ready') return; // locked in once a run has started
+        selectDifficulty(btn.dataset.diff);
+      });
+    });
+
+    // ---------------------------------------------------------------------
+    // Continues
+    // ---------------------------------------------------------------------
+    const MAX_CONTINUES = 3;
+    let continuesLeft = MAX_CONTINUES;
 
     // Cities the bird passes through, one every 5 points, then looping
     const CITIES = [
@@ -321,11 +451,21 @@
       frozen = false;
       isaacSplashEl.classList.remove('show');
       // give the bird a lift so play picks back up smoothly
-      bird.vy = FLAP;
+      bird.vy = cfg.flap;
     }
 
-    // Game state
-    let state = 'ready'; // ready | playing | dead
+    // Show the overlay with a given headline/subline, optionally the
+    // difficulty picker (only offered before a run has actually started).
+    function showOverlay(title, sub, showDifficulty, stats = '') {
+      msgTitle.textContent = title;
+      msgSub.textContent = sub;
+      statsLineEl.textContent = stats;
+      difficultyPanelEl.style.display = showDifficulty ? 'flex' : 'none';
+      overlay.style.display = 'flex';
+    }
+
+    // Game state: ready | playing | continue | dead
+    let state = 'ready';
     let frame = 0;
     let score = 0;
     let best = 0;
@@ -338,12 +478,7 @@
       rotation: 0
     };
 
-    const GRAVITY = 0.45;
-    const FLAP = -8;
-    const PIPE_GAP = 155;
     const PIPE_W = 62;
-    const PIPE_SPEED = 2.6;
-    const PIPE_INTERVAL = 95;
 
     let pipes = [];
     let groundOffset = 0;
@@ -364,6 +499,8 @@
       pendingIsaacGrave = false;
       frozen = false;
       isaacSplashEl.classList.remove('show');
+      continuesLeft = MAX_CONTINUES;
+      triesLabelEl.textContent = `Tries: ${continuesLeft}`;
     }
 
     function flap() {
@@ -374,21 +511,24 @@
       if (state === 'ready') {
         state = 'playing';
         overlay.style.display = 'none';
-        bird.vy = FLAP;
+        bird.vy = cfg.flap;
+        trackEvent('game_start', { difficulty });
       } else if (state === 'playing') {
-        bird.vy = FLAP;
+        bird.vy = cfg.flap;
+      } else if (state === 'continue') {
+        state = 'playing';
+        overlay.style.display = 'none';
+        bird.vy = cfg.flap;
       } else if (state === 'dead') {
         resetGame();
         state = 'ready';
-        overlay.style.display = 'flex';
-        msgTitle.textContent = 'Cemetery Bird';
-        msgSub.textContent = 'Tap or press Space to rise';
+        showOverlay('Cemetery Bird', 'Tap or press Space to rise', true);
       }
     }
 
     function spawnPipe() {
       const margin = 60;
-      const gapY = margin + Math.random() * (H - margin * 2 - PIPE_GAP - 100);
+      const gapY = margin + Math.random() * (H - margin * 2 - cfg.pipeGap - 100);
       const isaacGrave = pendingIsaacGrave;
       if (isaacGrave) pendingIsaacGrave = false;
       pipes.push({ x: W + 20, gapY, passed: false, isaacGrave });
@@ -410,14 +550,14 @@
       frame++;
 
       if (state === 'playing') {
-        bird.vy += GRAVITY;
+        bird.vy += cfg.gravity;
         bird.y += bird.vy;
         bird.rotation = Math.max(-0.5, Math.min(1.2, bird.vy / 10));
 
-        if (frame % PIPE_INTERVAL === 0) spawnPipe();
+        if (frame % cfg.pipeInterval === 0) spawnPipe();
 
         for (const p of pipes) {
-          p.x -= PIPE_SPEED;
+          p.x -= cfg.pipeSpeed;
           if (!p.passed && p.x + PIPE_W < bird.x) {
             p.passed = true;
             score++;
@@ -433,6 +573,7 @@
             if (foundIsaacNow) {
               isaacGraveTriggered = true;
               pendingIsaacGrave = true;
+              trackEvent('isaac_found', { score, difficulty });
               triggerIsaacFreeze();
             }
           }
@@ -444,25 +585,50 @@
         if (bird.y + bird.r > H - 40 || bird.y - bird.r < 0) hit = true;
         for (const p of pipes) {
           const topH = p.gapY;
-          const botY = p.gapY + PIPE_GAP;
+          const botY = p.gapY + cfg.pipeGap;
           if (rectCircleColl(bird.x, bird.y, bird.r - 2, p.x, 0, PIPE_W, topH)) hit = true;
           if (rectCircleColl(bird.x, bird.y, bird.r - 2, p.x, botY, PIPE_W, H - botY)) hit = true;
         }
 
         if (hit) {
-          state = 'dead';
-          best = Math.max(best, score);
-          overlay.style.display = 'flex';
-          msgTitle.textContent = 'Rest in Peace';
-          msgSub.textContent = `Score: ${formatScore(score)}  •  Best: ${formatBest(best)}  —  Tap to rise again`;
+          trackEvent('death', { score, difficulty, continuesLeft });
+          if (continuesLeft > 0) {
+            continuesLeft--;
+            triesLabelEl.textContent = `Tries: ${continuesLeft}`;
+            trackEvent('continue_used', { score, continuesLeft, difficulty });
+            state = 'continue';
+            // clear obstacles near the bird so resuming isn't an instant re-death
+            pipes = pipes.filter(p => p.x > bird.x + 90 || p.x < bird.x - PIPE_W - 40);
+            bird.y = H / 2;
+            bird.vy = 0;
+            bird.rotation = 0;
+            const triesWord = continuesLeft === 1 ? 'try' : 'tries';
+            showOverlay('You Fell...', `Score: ${formatScore(score)}  —  Tap to continue (${continuesLeft} ${triesWord} left)`, false);
+          } else {
+            state = 'dead';
+            best = Math.max(best, score);
+            sessionBest = Math.max(sessionBest, score);
+            gamesPlayed++;
+            sessionScoreSum += score;
+            const avg = Math.round(sessionScoreSum / gamesPlayed);
+            trackEvent('game_over', { score, best, difficulty, gamesPlayed });
+            showOverlay(
+              'Rest in Peace',
+              `Score: ${formatScore(score)}  •  Best: ${formatBest(best)}  —  Tap to rise again`,
+              true,
+              `Games played: ${gamesPlayed} • Session avg: ${formatScore(avg)}`
+            );
+          }
         }
 
-        groundOffset -= PIPE_SPEED;
+        groundOffset -= cfg.pipeSpeed;
       } else if (state === 'ready') {
         bird.y = H / 2 + Math.sin(frame / 15) * 8;
+      } else if (state === 'continue') {
+        bird.y = H / 2 + Math.sin(frame / 15) * 6;
       } else if (state === 'dead') {
         if (bird.y + bird.r < H - 40) {
-          bird.vy += GRAVITY;
+          bird.vy += cfg.gravity;
           bird.y += bird.vy;
         }
       }
@@ -597,7 +763,7 @@
     function drawPipes() {
       for (const p of pipes) {
         const topH = p.gapY;
-        const botY = p.gapY + PIPE_GAP;
+        const botY = p.gapY + cfg.pipeGap;
         // hanging stalactite-style stone from above (cut off at top of screen)
         drawTombstone(p.x, 0, PIPE_W, topH, false);
         // rising tombstone from the ground, rounded top facing the gap
@@ -791,6 +957,7 @@
     });
 
     resetGame();
+    diffLabelEl.textContent = cfg.label;
     loop();
   </script>
 </body>
