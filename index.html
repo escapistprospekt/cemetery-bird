@@ -55,6 +55,8 @@
       pointer-events: none;
       color: #d8c9f0;
       text-shadow: 0 0 12px #7a4fd6aa, 2px 2px 0 #00000088;
+      padding: 0 20px;
+      text-align: center;
     }
 
     #overlay h1 {
@@ -69,18 +71,36 @@
       opacity: 0.9;
     }
 
-    #statsLine {
-      margin-top: 10px;
-      font-size: 0.75em;
-      opacity: 0.7;
-      font-style: italic;
+    #setupPanel {
+      margin-top: 18px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      pointer-events: auto;
     }
 
-    #difficultyPanel {
-      margin-top: 22px;
+    #nameInput {
+      font-family: 'Georgia', serif;
+      font-size: 1em;
+      padding: 8px 14px;
+      border-radius: 6px;
+      border: 1px solid #7a6fa0;
+      background: rgba(20, 14, 32, 0.65);
+      color: #efe8c8;
+      text-align: center;
+      width: 200px;
+      outline: none;
+    }
+
+    #nameInput::placeholder {
+      color: #a698c4;
+      opacity: 0.7;
+    }
+
+    #diffRow {
       display: flex;
       gap: 10px;
-      pointer-events: auto;
     }
 
     .diffBtn {
@@ -107,6 +127,23 @@
       border-color: #efe8c8;
       color: #efe8c8;
       box-shadow: 0 0 14px #7a4fd688;
+    }
+
+    #dashboardBtn {
+      pointer-events: auto;
+      font-family: 'Georgia', serif;
+      font-size: 0.8em;
+      letter-spacing: 1px;
+      padding: 7px 14px;
+      border-radius: 6px;
+      border: 1px solid #5c8a7a;
+      background: rgba(20, 40, 34, 0.5);
+      color: #cfe8dc;
+      cursor: pointer;
+    }
+
+    #dashboardBtn:hover {
+      background: rgba(30, 60, 50, 0.7);
     }
 
     #score {
@@ -150,9 +187,25 @@
       font-family: 'Georgia', serif;
     }
 
-    #triesLabel {
+    #nameLabel {
       position: absolute;
       top: 24px;
+      left: 20px;
+      font-size: 0.8em;
+      letter-spacing: 1px;
+      color: #efe8c8;
+      opacity: 0.9;
+      pointer-events: none;
+      font-family: 'Georgia', serif;
+      max-width: 140px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    #triesLabel {
+      position: absolute;
+      top: 44px;
       left: 20px;
       font-size: 0.8em;
       letter-spacing: 1px;
@@ -164,7 +217,7 @@
 
     #diffLabel {
       position: absolute;
-      top: 44px;
+      top: 64px;
       left: 20px;
       font-size: 0.65em;
       letter-spacing: 1px;
@@ -273,6 +326,143 @@
         opacity: 0.9;
       }
     }
+
+    /* Dashboard: leaderboard + full try history */
+    #dashboardPanel {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(4, 2, 10, 0);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.35s ease, background 0.35s ease;
+      z-index: 20;
+      padding: 20px;
+    }
+
+    #dashboardPanel.show {
+      opacity: 1;
+      background: rgba(4, 2, 10, 0.88);
+      pointer-events: auto;
+    }
+
+    #dashboardCard {
+      background: rgba(24, 16, 40, 0.92);
+      border: 1px solid #5c4a80;
+      border-radius: 10px;
+      width: 100%;
+      max-width: 340px;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+      color: #d8c9f0;
+      font-family: 'Georgia', serif;
+      box-shadow: 0 0 30px rgba(122, 79, 214, 0.4);
+    }
+
+    #dashboardHeader {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid #4a3a68;
+    }
+
+    #dashboardHeader h2 {
+      font-size: 1.2em;
+      letter-spacing: 1px;
+      color: #efe8c8;
+    }
+
+    #dashboardCloseBtn {
+      background: none;
+      border: none;
+      color: #d8c9f0;
+      font-size: 1.3em;
+      cursor: pointer;
+      line-height: 1;
+      padding: 4px 8px;
+    }
+
+    #dashboardBody {
+      overflow-y: auto;
+      padding: 12px 16px 18px;
+    }
+
+    .dashSection h3 {
+      font-size: 0.8em;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #a698c4;
+      margin: 14px 0 8px;
+    }
+
+    .dashSection:first-child h3 {
+      margin-top: 0;
+    }
+
+    .lbList {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .lbList li {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85em;
+      padding: 5px 8px;
+      border-radius: 5px;
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .lbList li.empty {
+      opacity: 0.6;
+      font-style: italic;
+      justify-content: center;
+    }
+
+    .lbRank {
+      width: 24px;
+      color: #f0a83c;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+
+    .lbName {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: #efe8c8;
+    }
+
+    .lbScore {
+      color: #d8c9f0;
+      flex-shrink: 0;
+    }
+
+    .lbDiff {
+      font-size: 0.85em;
+      opacity: 0.65;
+      text-transform: capitalize;
+      flex-shrink: 0;
+      width: 46px;
+      text-align: right;
+    }
+
+    .lbDate {
+      font-size: 0.75em;
+      opacity: 0.55;
+      flex-shrink: 0;
+    }
   </style>
 </head>
 
@@ -282,17 +472,21 @@
     <div id="score">Isaac</div>
     <div id="tagline">Collect 50 Isaacs to increase your chances of finding Isaac</div>
     <div id="cityLabel">London</div>
+    <div id="nameLabel"></div>
     <div id="triesLabel">Tries: 3</div>
     <div id="diffLabel">Normal</div>
     <div id="cityBanner"></div>
     <div id="overlay">
       <h1 id="msgTitle">Cemetery Bird</h1>
-      <p id="msgSub">Tap or press Space to start</p>
-      <p id="statsLine"></p>
-      <div id="difficultyPanel">
-        <button class="diffBtn" data-diff="easy">Easy</button>
-        <button class="diffBtn selected" data-diff="normal">Normal</button>
-        <button class="diffBtn" data-diff="hard">Hard</button>
+      <p id="msgSub">Enter your name, then tap or press Space to start</p>
+      <div id="setupPanel">
+        <input id="nameInput" type="text" maxlength="18" placeholder="Enter your name" autocomplete="off">
+        <div id="diffRow">
+          <button class="diffBtn" data-diff="easy">Easy</button>
+          <button class="diffBtn selected" data-diff="normal">Normal</button>
+          <button class="diffBtn" data-diff="hard">Hard</button>
+        </div>
+        <button id="dashboardBtn">📊 Dashboard</button>
       </div>
     </div>
     <div id="isaacSplash">
@@ -300,6 +494,24 @@
       <h2>You found Isaac...</h2>
       <p>He rests among the fallen.</p>
       <div class="hint">Tap to continue flying</div>
+    </div>
+    <div id="dashboardPanel">
+      <div id="dashboardCard">
+        <div id="dashboardHeader">
+          <h2>Dashboard</h2>
+          <button id="dashboardCloseBtn">✕</button>
+        </div>
+        <div id="dashboardBody">
+          <div class="dashSection">
+            <h3>Leaderboard</h3>
+            <ul id="leaderboardList" class="lbList"></ul>
+          </div>
+          <div class="dashSection">
+            <h3>All Tries</h3>
+            <ul id="triesList" class="lbList"></ul>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -312,36 +524,97 @@
     const overlay = document.getElementById('overlay');
     const msgTitle = document.getElementById('msgTitle');
     const msgSub = document.getElementById('msgSub');
-    const statsLineEl = document.getElementById('statsLine');
+    const setupPanelEl = document.getElementById('setupPanel');
+    const nameInputEl = document.getElementById('nameInput');
     const cityLabelEl = document.getElementById('cityLabel');
     const cityBannerEl = document.getElementById('cityBanner');
     const isaacSplashEl = document.getElementById('isaacSplash');
+    const nameLabelEl = document.getElementById('nameLabel');
     const triesLabelEl = document.getElementById('triesLabel');
     const diffLabelEl = document.getElementById('diffLabel');
-    const difficultyPanelEl = document.getElementById('difficultyPanel');
     const diffButtons = Array.from(document.querySelectorAll('.diffBtn'));
+    const dashboardBtn = document.getElementById('dashboardBtn');
+    const dashboardPanelEl = document.getElementById('dashboardPanel');
+    const dashboardCardEl = document.getElementById('dashboardCard');
+    const dashboardCloseBtn = document.getElementById('dashboardCloseBtn');
+    const leaderboardListEl = document.getElementById('leaderboardList');
+    const triesListEl = document.getElementById('triesList');
+
+    function escapeHtml(str) {
+      return String(str).replace(/[&<>"']/g, ch => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[ch]));
+    }
 
     // ---------------------------------------------------------------------
-    // Analytics
+    // Run history (dashboard + leaderboard)
     // ---------------------------------------------------------------------
-    // This is a static file with no backend, so "analytics" here means:
-    //  1) an in-memory session log + on-screen session stats (games played,
-    //     session best/average) — resets on page reload, no storage used.
-    //  2) a single trackEvent() choke point. Once this is hosted for real,
-    //     drop in a privacy-friendly analytics snippet (e.g. Plausible,
-    //     GoatCounter, or Google Analytics's gtag.js) in <head>, and
-    //     trackEvent() will automatically forward events to it if it finds
-    //     window.plausible or window.gtag — no other code changes needed.
-    const analyticsLog = [];
-    function trackEvent(name, data = {}) {
-      analyticsLog.push({ name, data, t: Date.now() });
-      console.log('[analytics]', name, data);
-      if (typeof window.gtag === 'function') window.gtag('event', name, data);
-      if (typeof window.plausible === 'function') window.plausible(name, { props: data });
+    // Static file, no backend — persisted via localStorage so it survives
+    // reloads once this is hosted for real. That means it's scoped to
+    // whoever plays on this particular browser/device, not a shared
+    // cross-device leaderboard (that would need an actual backend).
+    const RUNS_KEY = 'cemeteryBirdRuns';
+    function loadRuns() {
+      try {
+        const raw = localStorage.getItem(RUNS_KEY);
+        return raw ? JSON.parse(raw) : [];
+      } catch (e) {
+        return [];
+      }
     }
-    let gamesPlayed = 0;
-    let sessionScoreSum = 0;
-    let sessionBest = 0;
+    function saveRuns(runs) {
+      try {
+        localStorage.setItem(RUNS_KEY, JSON.stringify(runs));
+      } catch (e) {
+        // storage unavailable (private browsing, sandboxed preview, etc.) — just keep in memory
+      }
+    }
+    let runHistory = loadRuns();
+    function recordRun(name, score, diff) {
+      runHistory.unshift({ name, score, diff, date: Date.now() });
+      if (runHistory.length > 200) runHistory.length = 200;
+      saveRuns(runHistory);
+    }
+    function renderDashboard() {
+      const leaderboard = [...runHistory].sort((a, b) => b.score - a.score).slice(0, 10);
+      leaderboardListEl.innerHTML = leaderboard.length
+        ? leaderboard.map((r, i) => `
+            <li>
+              <span class="lbRank">#${i + 1}</span>
+              <span class="lbName">${escapeHtml(r.name)}</span>
+              <span class="lbScore">${r.score} Isaac</span>
+              <span class="lbDiff">${escapeHtml(r.diff)}</span>
+            </li>`).join('')
+        : '<li class="empty">No runs yet</li>';
+
+      triesListEl.innerHTML = runHistory.length
+        ? runHistory.slice(0, 30).map(r => `
+            <li>
+              <span class="lbName">${escapeHtml(r.name)}</span>
+              <span class="lbScore">${r.score} Isaac</span>
+              <span class="lbDiff">${escapeHtml(r.diff)}</span>
+              <span class="lbDate">${new Date(r.date).toLocaleDateString()}</span>
+            </li>`).join('')
+        : '<li class="empty">No tries yet</li>';
+    }
+    dashboardBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      renderDashboard();
+      dashboardPanelEl.classList.add('show');
+    });
+    dashboardCloseBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dashboardPanelEl.classList.remove('show');
+    });
+    dashboardPanelEl.addEventListener('click', () => dashboardPanelEl.classList.remove('show'));
+    dashboardCardEl.addEventListener('click', (e) => e.stopPropagation());
+    nameInputEl.addEventListener('click', (e) => e.stopPropagation());
+    nameInputEl.addEventListener('keydown', (e) => e.stopPropagation());
+
+    // ---------------------------------------------------------------------
+    // Player name
+    // ---------------------------------------------------------------------
+    let playerName = '';
 
     // ---------------------------------------------------------------------
     // Difficulty modes
@@ -455,12 +728,11 @@
     }
 
     // Show the overlay with a given headline/subline, optionally the
-    // difficulty picker (only offered before a run has actually started).
-    function showOverlay(title, sub, showDifficulty, stats = '') {
+    // name/difficulty/dashboard setup row (only offered before a run starts).
+    function showOverlay(title, sub, showSetup) {
       msgTitle.textContent = title;
       msgSub.textContent = sub;
-      statsLineEl.textContent = stats;
-      difficultyPanelEl.style.display = showDifficulty ? 'flex' : 'none';
+      setupPanelEl.style.display = showSetup ? 'flex' : 'none';
       overlay.style.display = 'flex';
     }
 
@@ -503,16 +775,22 @@
       triesLabelEl.textContent = `Tries: ${continuesLeft}`;
     }
 
+    function beginRun() {
+      const typed = nameInputEl.value.trim();
+      playerName = (typed || 'Anonymous').slice(0, 18);
+      nameLabelEl.textContent = playerName;
+      state = 'playing';
+      overlay.style.display = 'none';
+      bird.vy = cfg.flap;
+    }
+
     function flap() {
       if (frozen) {
         resumeFromFreeze();
         return;
       }
       if (state === 'ready') {
-        state = 'playing';
-        overlay.style.display = 'none';
-        bird.vy = cfg.flap;
-        trackEvent('game_start', { difficulty });
+        beginRun();
       } else if (state === 'playing') {
         bird.vy = cfg.flap;
       } else if (state === 'continue') {
@@ -522,7 +800,7 @@
       } else if (state === 'dead') {
         resetGame();
         state = 'ready';
-        showOverlay('Cemetery Bird', 'Tap or press Space to rise', true);
+        showOverlay('Cemetery Bird', 'Ready for another try?', true);
       }
     }
 
@@ -573,7 +851,6 @@
             if (foundIsaacNow) {
               isaacGraveTriggered = true;
               pendingIsaacGrave = true;
-              trackEvent('isaac_found', { score, difficulty });
               triggerIsaacFreeze();
             }
           }
@@ -591,11 +868,9 @@
         }
 
         if (hit) {
-          trackEvent('death', { score, difficulty, continuesLeft });
           if (continuesLeft > 0) {
             continuesLeft--;
             triesLabelEl.textContent = `Tries: ${continuesLeft}`;
-            trackEvent('continue_used', { score, continuesLeft, difficulty });
             state = 'continue';
             // clear obstacles near the bird so resuming isn't an instant re-death
             pipes = pipes.filter(p => p.x > bird.x + 90 || p.x < bird.x - PIPE_W - 40);
@@ -607,16 +882,11 @@
           } else {
             state = 'dead';
             best = Math.max(best, score);
-            sessionBest = Math.max(sessionBest, score);
-            gamesPlayed++;
-            sessionScoreSum += score;
-            const avg = Math.round(sessionScoreSum / gamesPlayed);
-            trackEvent('game_over', { score, best, difficulty, gamesPlayed });
+            recordRun(playerName, score, difficulty);
             showOverlay(
               'Rest in Peace',
               `Score: ${formatScore(score)}  •  Best: ${formatBest(best)}  —  Tap to rise again`,
-              true,
-              `Games played: ${gamesPlayed} • Session avg: ${formatScore(avg)}`
+              true
             );
           }
         }
@@ -953,7 +1223,11 @@
     isaacSplashEl.addEventListener('mousedown', flap);
     isaacSplashEl.addEventListener('touchstart', (e) => { e.preventDefault(); flap(); }, { passive: false });
     document.addEventListener('keydown', (e) => {
-      if (e.code === 'Space') { e.preventDefault(); flap(); }
+      if (e.code === 'Space') {
+        if (document.activeElement === nameInputEl) return; // don't hijack spacebar while typing
+        e.preventDefault();
+        flap();
+      }
     });
 
     resetGame();
